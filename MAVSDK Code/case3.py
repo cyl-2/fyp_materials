@@ -6,7 +6,7 @@ from mavsdk.mission import (MissionItem, MissionPlan)
 
 """
 Given that the actual weed detection and decision-making for pesticide release are 
-complex topics involving computer vision and AI, I'll include pseudocode placeholders 
+complex topics involving computer vision and AI, I included pseudocode placeholders 
 for these functionalities.
 """
 
@@ -56,8 +56,6 @@ async def run():
     print("Starting mission...")
     await drone.mission.start_mission()
 
-    # Real-time telemetry and adaptive maneuvering
-    # This is a simplified example. In a real scenario, this would involve complex logic.
     # Monitor mission progress
     async for mission_progress in drone.mission.mission_progress():
         print(f"Mission progress: {mission_progress.current}/{mission_progress.total}")
@@ -78,12 +76,12 @@ async def run():
 # Placeholder functions for drone adjustment and pesticide release
 def detect_weeds(camera_input):
     # Pseudocode for detecting weeds
-    # This would involve analyzing the camera input for signs of weed infestation
+    # This would involve analysing the camera input for signs of weed infestation
     return False  # Replace with actual detection logic
 
 def adjust_position_for_optimal_spraying():
     # goto_location(latitude_deg, longitude_deg, absolute_altitude_m, yaw_deg)
-    
+    # Adaptive maneouvering
     await drone.action.goto_location(latitude, 
                                      longitude,
                                      altitude,

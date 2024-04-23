@@ -5,7 +5,7 @@ from mavsdk import System
 from mavsdk.mission import (MissionItem, MissionPlan)
 
 async def run():
-    # Initialize the drone
+    # Initialise the drone
     drone = System()
     await drone.connect(system_address="udp://:14540")
 

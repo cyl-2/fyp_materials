@@ -1,184 +1,106 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-
-from dronekit import connect, VehicleMode, LocationGlobal
+from dronekit import connect, VehicleMode
 import time
-import argparse
+
 
 class Drone:
-    def __init__(self, vehicle, target_location):
-        # Connect to the Vehicle
-        self._log('Connected to vehicle.')
+    # ...
 
-        """
-        Initializes the Drone object.
-        
-        Args:
-            vehicle (Vehicle): The connected vehicle object.
-            target_location (list): [latitude, longitude, altitude] of target location.
-        """
+    # Everything else is the same as case study 2
 
+    def __init__(self, vehicle, home_location, waypoints):
         self.vehicle = vehicle
         self.home_location = [self.vehicle.location.global_frame.lat,
                             self.vehicle.location.global_frame.lon, 60.0]
-        self.target_location = target_location
+        self.waypoints = waypoints
         
         self.navigation_system = NavigationSystem(self.vehicle)
-        self.payload_delivery_system = PayloadDeliverySystem(self.vehicle)
-
-        self._log("Drone preparing for launch")
-
-        # Register observers
-        self.vehicle.add_attribute_listener('location',  self.navigation_system.location_callback)
-
-    def launch(self):
-        self._log('Launching drone...')
-        
-        self._log("Waiting to arm...")
-        while not self.vehicle.is_armable:
-            time.sleep(.1)
-
-        retries = 3
-        for i in range(retries):
-            self._log("Attempt at launching")
-            print(self.vehicle.mode)
-            self.vehicle.mode = VehicleMode("GUIDED")
-            #print(self.vehicle.mode)
-            self.arm()
-            self.takeoff()
-
-    def arm(self, value=True): 
-        if value:
-            self.vehicle.armed = True
-            while not self.vehicle.armed:
-                time.sleep(.1)
-        else:
-            self.vehicle.armed = False
-
-    def takeoff(self):
-        self._log("Taking off")
-
-        self.vehicle.airspeed = 5 # 5 meters per second
-        self.vehicle.simple_takeoff(self.target_location[2])  
-
-        # Wait for takeoff to complete
-        # Creates a loop that continues until the drone's current altitude >= 95% of the desired altitude
-        altitude = self.target_location[2]
-        while not self.vehicle.location.global_relative_frame.alt >= altitude * 0.95:
-            print("Altitude: ", self.vehicle.location.global_relative_frame.alt)
-            time.sleep(1)
-
-        # If correct altitude reached, start the mission
-        if self.vehicle.location.global_relative_frame.alt >= altitude * 0.95:
-            self.start_mission()
-        else:
-            # Autonomous fail-safe landing procedure
-            self._log("Vehicle failed launch - activated fail-safe landing procedure")
-            self.vehicle.mode = VehicleMode("LAND") 
-            while self.vehicle.armed:
-                time.sleep(1)
+        self.camera_system = CameraSystem(self.vehicle)
+        self.spray_system = SpraySystem(self.vehicle)
 
     def start_mission(self):
         self._log("Mission START")
         # Set mode to AUTO to start mission
         self.vehicle.mode = VehicleMode("AUTO")
-        self._log("Start navigation to target location")
-        self.navigation_system.navigate(self.target_location)
-        self.payload_delivery_system.payload_delivery()
-  
-        self._log("Returning to home base")
-        self.navigation_system.navigate(self.home_location, True)
+        self._log("Start crop monitoring")
 
-    def _log(self, message):
-        print("[DEBUG]: {0}".format(message))
+        self.navigation_system.survey(waypoints)
+
+        self._log("Returning to home base")
+        self.navigation_system().goto_waypoint(self.home_location, True)
+    
+    
 
 class NavigationSystem:
+    # ...
 
-    """
-    Navigation operations
-    """
+    # Everything else is the same as case study 2
 
-    def __init__(self, vehicle):
-        self.vehicle = vehicle
+    def goto_waypoint(self, waypoint):
+        self.vehicle.simple_goto(waypoint)
 
-    # Navigates the drone to a given location.
-    def navigate(self, location, land=False):
-        # Plan route and navigate
-        self.vehicle.simple_goto(LocationGlobal(location)) # coordinates are absolute positions on the Earth's surface
+        # ...
 
-        # Wait for navigation to complete
-        while not self.location_reached():
-            if self.obstacles_detected():
-                # TODO: Attempt route replanning
-                # TODO: If replanning fails, activate fail-safe route
-                # TODO: Notify operator for manual intervention if necessary
-                break
+        # Everything else is the same as case study 2
 
-            if self.harsh_weather_conditions():
-                # TODO:Adjust flight parameters for stability
-                # TODO: Consider rerouting if necessary
-                break
-            time.sleep(1) 
+    def survey(self, waypoints):
+        for waypoint in waypoints:
+            
+            # Go to the next waypoint
+            self.goto_waypoint(waypoint)
 
-        # Land the UAV if this is navigating back home
-        if land is True:
-            self.vehicle.mode = VehicleMode("RTL")
-            while self.vehicle.armed:
+            # Wait for the vehicle to reach the waypoint
+            while not self.vehicle.location.global_relative_frame.distance_to(waypoint) < 1:
                 time.sleep(1)
-            # TODO: Implement proper logic for landing
+            
+                # Begin surveying and weed detection
+                self.check_battery()
+                 
+                # Weed detected
+                attitude = self.capture_image()
+                if len(attitude) == 3:
+                    self.spray_system.spray_weed(attitude, waypoint)
 
+    def check_battery(self):
+        # Check battery level and return home if low
+        if self.vehicle.battery.level <= 20:  # Example threshold for low battery
+            self.goto_waypoint(self.home_location, True)
+            break
+
+class CameraSystem:
+    def __init__(self):
+        self.vehicle = vehicle
+
+    def capture_image(self):
+        # Capture image every second
+        # ...
         
-    # Checks if the drone has reached the target location.
-    def location_reached(self):
-        # TODO: Implement your logic to check if the drone is at the target location
-        target = [self.vehicle.target_location[0], self.vehicle.target_location[1]]
-        current_location = [self.vehicle.current_location.lat, self.vehicle.current_location.lon]
-        if current_location == target:
-            return True
+        result = self.send_image_to_ground_station(image_data)
+        return result
+        
+    def send_image_to_ground_station(self, image_data):
+        """
+            DroneKit itself does not provide built-in functionality for transmitting image data to a ground station. 
+            It only provides an interface for controlling UAV flight and accessing telemetry data. 
+            Transmitting image data typically involves using separate communication methods or protocols, 
+            which needs to be implement separately from DroneKit.
+            
+        """
+        # ...
+        return result # returns either an empty list, or a list of optimal orientation values for spraying
+    
 
-    # Receive updates about the vehicle's location
-    def location_callback(self, vehicle, name, location):
-        if self.vehicle.location.global_relative_frame.alt is not None:
-            self.vehicle.altitude = self.vehicle.location.global_relative_frame.alt
-
-        self.vehicle.current_location = self.vehicle.location.global_relative_frame
-
-class PayloadDeliverySystem:
-    """
-    Managing payload delivery operations
-
-    Args:
-        vehicle (Vehicle): The connected vehicle object.
-        delivering_altitude (float): The altitude at which payload delivery should occur.
-    """
+class SpraySystem:
 
     def __init__(self, vehicle):
         self.vehicle = vehicle
-        self.delivering_altitude = 30.0
+        self.spraying_altitude = 5.0
 
-    # Deploying the payload
-    def payload_delivery(self):
-        # Verify UAV is at the correct altitude
-        self.adjust_altitude(delivering_altitude)
-        if self.vehicle.location.global_relative_frame.alt == delivering_altitude:
-            # Deploy payload - code taken from https://stackoverflow.com/questions/36636073/is-it-possible-to-control-an-actuator-using-dronekit-python
-            msg = vehicle.message_factory.command_long_encode(
-            0, 0,    # target_system, target_component
-            mavutil.mavlink.MAV_CMD_DO_SET_SERVO, #command
-            0, #confirmation
-            1,    # servo number
-            1500,          # servo position between 1000 and 2000
-            0, 0, 0, 0, 0)    # param 3 ~ 7 not used
+    # Function to spray weed at the current location
+    def spray_weed(self, attitude, waypoint):
+        waypoint.alt = self.spraying_altitude
 
-            # send command to vehicle
-            vehicle.send_mavlink(msg)
-            # TODO: Check payload deployment status
-            pass
-
-    # Altitude adjustment at target location
-    def adjust_altitude(self, altitude):
-        self.vehicle.simple_goto(LocationGlobal(self.vehicle.target_location[0], self.vehicle.target_location[1], delivering_altitude))
+        self.vehicle.mode = VehicleMode("LOITER")
+        self.vehicle.simple_goto(waypoint)
 
         # Wait for altitude adjustment to complete
         while not abs(self.vehicle.location.global_relative_frame.alt - target_altitude) < 0.5:
@@ -187,24 +109,20 @@ class PayloadDeliverySystem:
                 # TODO: Notify operator for manual intervention
                 break
             time.sleep(1)
-    
-    def altitude_adjustment_fails(self):
-        # TODO: Method to check if the altitude adjustment was successful or not
-        pass
 
+        # Adjust the angle by setting the desired roll, pitch, and yaw angles
+        self.vehicle.attitude.roll = attitude[0]
+        self.vehicle.attitude.pitch = attitude[1]
+        self.vehicle.attitude.yaw = attitude[2]
+        
+
+        # TODO: Code to activate sprayer
+
+        self.vehicle.mode = VehicleMode("AUTO")
+    
 
 
 if __name__ == "__main__":
-
-    # Set up option parsing to get connection string
-    
-    parser = argparse.ArgumentParser(description='Commands vehicle')
-    parser.add_argument('--connect',
-                        help="Vehicle connection target string. If not specified, SITL automatically started and used.")
-    args = parser.parse_args()
-
-    connection_string = args.connect
-    sitl = None
 
     # Start SITL if no connection string specified
     if not connection_string:
@@ -212,13 +130,20 @@ if __name__ == "__main__":
         sitl = dronekit_sitl.start_default()
         connection_string = sitl.connection_string()
 
+    # Define waypoints for surveying the crop field
+    waypoints = [
+        LocationGlobal(a, b, alt1),
+        LocationGlobal(i, j, alt2),
+        LocationGlobal(x, y, alt3),
+        LocationGlobal(p, q, alt4),
+        LocationGlobal(m, n, alt5)]
+
     # Connect to the vehicle
     vehicle = connect(connection_string, wait_ready=True)
-    #vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
 
-    target_location = [-35.361354, 149.165218, 20] #dest_latitude, dest_longitude, dest_altitude]
+    home_location = [src_latitude, src_longitude, src_altitude]
 
     print('Launching Drone...')
-    Drone(vehicle, target_location).launch()
+    Drone(vehicle, home_location, waypoints).launch()
 
     vehicle.close()

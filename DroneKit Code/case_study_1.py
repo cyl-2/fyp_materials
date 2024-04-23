@@ -59,8 +59,6 @@ def goto_waypoint_and_land(target_location):
 
     print("FLying to the target waypoint!")
     vehicle.simple_goto(LocationGlobal(target_location))
-    # There is no built-in function that notifies the user when the location has been reached
-    # Once the location has been reached, the next line of code gets executed immediately
 
     print("Landing the vehicle")
     vehicle.mode = VehicleMode("LAND")
